@@ -1,5 +1,5 @@
 from django.db import models
-from Base.models import BaseModel,State
+from Base.models import BaseModel
 
 # defining models for the project execution
 class Project(BaseModel):

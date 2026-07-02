@@ -1,5 +1,5 @@
 from django.db import models
-from Base.models import BaseModel,State
+from Base.models import BaseModel
 
 
 

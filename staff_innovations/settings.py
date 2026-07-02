@@ -41,7 +41,7 @@ INSTALLED_APPS = [
     'ideas',
     'users',
     'projects',
-    'Transaction_Log_Base',
+    'transaction_log_base',
     'notifications',
 ]
 
