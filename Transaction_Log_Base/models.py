@@ -16,7 +16,10 @@ class TransactionLogBase(BaseModel):
     entity_name = models.CharField(null=True, blank=True, max_length=30)
 
 
-    # class Meta:
-    #     abstract = True
+class Notifications(TransactionLogBase):
+    read_at = models.DateField(null=True, blank=True)
+
+
+
 
 

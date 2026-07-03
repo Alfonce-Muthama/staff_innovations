@@ -42,7 +42,6 @@ INSTALLED_APPS = [
     'users',
     'projects',
     'Transaction_Log_Base',
-    'notifications',
 ]
 
 MIDDLEWARE = [
