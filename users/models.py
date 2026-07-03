@@ -22,12 +22,13 @@ class Department(BaseModel):
 
 
 class Role(BaseModel):
-    description = models.TextField(null=True, blank=True)
+    description_name = models.TextField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
 
     def __str__(self):
         return self.name
+
 
 
 
