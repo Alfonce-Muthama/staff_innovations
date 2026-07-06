@@ -2,9 +2,14 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.hashers import make_password, check_password
 from .models import User,Department
+from .decorators import jwt_required,role_required
+import jwt
+import datetime
+from django.conf import settings
 import json
+from django.http import HttpRequest
 
-
+# CREATE USER
 @csrf_exempt
 def create_user(request):
     if request.method == "POST":
@@ -78,25 +83,121 @@ def create_user(request):
 
 # LOGIN USER
 @csrf_exempt
-def login_user(request):
+def login_user(request: HttpRequest):
     if request.method == "POST":
+
+        request.COOKIES
         data = json.loads(request.body)
 
         try:
             user = User.objects.get(username=data["username"])
 
             if check_password(data["password"], user.password):
+                payload = {
+                    "user_id": str(user.id),
+                    "username": user.username,
+                    "role": user.role,
+                    "iat": datetime.datetime.now(datetime.UTC),
+                    "exp": datetime.datetime.now(datetime.UTC) + datetime.timedelta(minutes=30)
+                }
+
+                token = request.COOKIES.set("jwt")
+
+                if not token:
+                    return JsonResponse(
+                        {"error": "Authentication credentials not provided."},
+                        status=401
+                    )
+
+                try:
+                    payload = jwt.decode(
+                        token,
+                        settings.SECRET_KEY,
+                        algorithms=["HS256"]
+                    )
+
+                    request.user_id = payload["user_id"]
+                    request.username = payload["username"]
+                    request.role = payload["role"]
+
+                except jwt.ExpiredSignatureError:
+                    return JsonResponse({"error": "Token expired"}, status=401)
+
+                except jwt.InvalidTokenError:
+                    return JsonResponse({"error": "Invalid token"}, status=401)
+
+
                 return JsonResponse({
                     "message": "Login successful",
+                    "token": token,
                     "username": user.username,
                     "role": user.role
                 })
-
             return JsonResponse({"error": "Invalid password"}, status=401)
 
         except User.DoesNotExist:
             return JsonResponse({"error": "User not found"}, status=404)
 
     return JsonResponse({"error": "POST method required"}, status=405)
+
+
+
+
+# UPDATE
+@csrf_exempt
+@jwt_required
+@role_required
+def update_user(request, pk):
+    if request.method == "PUT":
+        try:
+            user = User.objects.get(pk=pk)
+            data = json.loads(request.body)
+
+            user.username = data.get("username", user.username)
+            user.email = data.get("email", user.email)
+            if data.get("password"):
+                user.password = make_password(data["password"])
+            user.first_name = data.get("first_name", user.first_name)
+            user.last_name = data.get("last_name", user.last_name)
+            user.role = data.get("role", user.role)
+            if "department_id" in data:
+                user.department = Department.objects.get(
+                    id=data["department_id"]
+                )
+
+            user.save()
+
+            return JsonResponse({"message": "user updated successfully"})
+
+        except User.DoesNotExist:
+            return JsonResponse({"error": "user not found"}, status=404)
+
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=400)
+
+    return JsonResponse({"error": "PUT method required"}, status=405)
+
+
+
+#DELETE
+@csrf_exempt
+@jwt_required
+@role_required
+def delete_user(request, pk):
+    if request.method == "DELETE":
+        try:
+            user = User.objects.get(pk=pk)
+            user.delete()
+
+            return JsonResponse({
+                "message": "user deleted successfully"
+            })
+
+        except User.DoesNotExist:
+            return JsonResponse({"error": "user not found"}, status=404)
+
+    return JsonResponse({"error": "DELETE method required"}, status=405)
+
+
 
 
