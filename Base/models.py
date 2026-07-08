@@ -16,7 +16,7 @@ class BaseModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True , verbose_name=_('Date created'))
     updated_at = models.DateTimeField(auto_now=True, verbose_name=_('Date modified'))
     state = models.ForeignKey(
-        "Base.State", 
+        "Base.State",
         on_delete=models.CASCADE,
         default=get_default_state,
     )

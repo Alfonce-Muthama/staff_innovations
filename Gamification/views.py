@@ -1,7 +1,7 @@
 from django.http import JsonResponse
 from users.models import User
 
-#showing the highest schoring employee
+#showing the highest scoring employee
 def leaderboard(request):
 
     users = User.objects.order_by("-points")

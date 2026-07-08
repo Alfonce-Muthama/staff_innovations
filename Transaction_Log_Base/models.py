@@ -2,7 +2,6 @@ from django.db import models
 
 from Base.models import BaseModel
 
-
 # Create your models here.
 class TransactionLogBase(BaseModel):
     title = models.CharField(null=True, blank=True,max_length=200)

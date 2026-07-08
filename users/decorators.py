@@ -21,45 +21,42 @@ def role_required(allowed_roles):
         return wrapper
 
     return decorator
+
 def jwt_required(view_func):
     @wraps(view_func)
     def wrapper(request, *args, **kwargs):
+        token = request.COOKIES.get("jwt")
 
-        auth_header = request.headers.get("Authorization")
+        if token is None:
+            auth_header = request.headers.get("Authorization")
+            if auth_header and auth_header.startswith("Bearer "):
+                token = auth_header.split(" ", 1)[1]
 
-        if not auth_header:
+        if token is None:
             return JsonResponse(
-                {"error": "Authorization header missing"},
-                status=401
+                {"error": "Authentication credentials not provided"},
+                status=401,
             )
 
         try:
-            token = auth_header.split(" ")[1]
-
             payload = jwt.decode(
                 token,
                 settings.SECRET_KEY,
-                algorithms=["HS256"]
+                algorithms=["HS256"],
             )
 
-            # Make the logged-in user's information available in the view
             request.user_id = payload["user_id"]
             request.username = payload["username"]
             request.role = payload["role"]
 
         except jwt.ExpiredSignatureError:
-            return JsonResponse(
-                {"error": "Token has expired"},
-                status=401
-            )
+            return JsonResponse({"error": "Token has expired"}, status=401)
 
         except jwt.InvalidTokenError:
-            return JsonResponse(
-                {"error": "Invalid token"},
-                status=401
-            )
+            return JsonResponse({"error": "Invalid token"}, status=401)
 
         return view_func(request, *args, **kwargs)
 
     return wrapper
+
 

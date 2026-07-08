@@ -25,9 +25,11 @@ class Role(BaseModel):
     description_name = models.TextField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-
     def __str__(self):
-        return self.name
+        return self.description_name
+
+
+
 
 
 

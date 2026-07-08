@@ -7,7 +7,7 @@ import jwt
 import datetime
 from django.conf import settings
 import json
-from django.http import HttpRequest
+from django.http import HttpRequest, HttpResponse
 
 # CREATE USER
 @csrf_exempt
@@ -80,68 +80,57 @@ def create_user(request):
 
     return JsonResponse({"error": "POST method required"}, status=405)
 
-
 # LOGIN USER
 @csrf_exempt
 def login_user(request: HttpRequest):
-    if request.method == "POST":
+    if request.method != "POST":
+        return JsonResponse({"error": "POST method required"}, status=405)
 
-        request.COOKIES
+    try:
         data = json.loads(request.body)
 
-        try:
-            user = User.objects.get(username=data["username"])
+        user = User.objects.get(username=data["username"])
 
-            if check_password(data["password"], user.password):
-                payload = {
-                    "user_id": str(user.id),
-                    "username": user.username,
-                    "role": user.role,
-                    "iat": datetime.datetime.now(datetime.UTC),
-                    "exp": datetime.datetime.now(datetime.UTC) + datetime.timedelta(minutes=30)
-                }
-
-                token = request.COOKIES.set("jwt")
-
-                if not token:
-                    return JsonResponse(
-                        {"error": "Authentication credentials not provided."},
-                        status=401
-                    )
-
-                try:
-                    payload = jwt.decode(
-                        token,
-                        settings.SECRET_KEY,
-                        algorithms=["HS256"]
-                    )
-
-                    request.user_id = payload["user_id"]
-                    request.username = payload["username"]
-                    request.role = payload["role"]
-
-                except jwt.ExpiredSignatureError:
-                    return JsonResponse({"error": "Token expired"}, status=401)
-
-                except jwt.InvalidTokenError:
-                    return JsonResponse({"error": "Invalid token"}, status=401)
-
-
-                return JsonResponse({
-                    "message": "Login successful",
-                    "token": token,
-                    "username": user.username,
-                    "role": user.role
-                })
+        if not check_password(data["password"], user.password):
             return JsonResponse({"error": "Invalid password"}, status=401)
 
-        except User.DoesNotExist:
-            return JsonResponse({"error": "User not found"}, status=404)
+        payload = {
+            "user_id": str(user.id),
+            "username": user.username,
+            "role": user.role,
+            "iat": datetime.datetime.now(datetime.UTC),
+            "exp": datetime.datetime.now(datetime.UTC)
+                   + datetime.timedelta(minutes=30),
+        }
 
-    return JsonResponse({"error": "POST method required"}, status=405)
+        token = jwt.encode(
+            payload,
+            settings.SECRET_KEY,
+            algorithm="HS256"
+        )
 
+        response = JsonResponse({
+            "message": "Login successful",
+            "token": token,
+            "username": user.username,
+            "role": user.role,
+        })
 
+        response.set_cookie(
+            key="jwt",
+            value=token,
+            httponly=True,
+            samesite="Lax",
+            secure=False,
+            max_age=30 * 60,
+        )
 
+        return response
+
+    except User.DoesNotExist:
+        return JsonResponse({"error": "User not found"}, status=404)
+    except (KeyError, json.JSONDecodeError):
+        return JsonResponse({"error": "Invalid request body"}, status=400)
 
 # UPDATE
 @csrf_exempt
@@ -161,10 +150,15 @@ def update_user(request, pk):
             user.last_name = data.get("last_name", user.last_name)
             user.role = data.get("role", user.role)
             if "department_id" in data:
-                user.department = Department.objects.get(
-                    id=data["department_id"]
-                )
-
+                try:
+                    user.department_id = Department.objects.get(
+                        id=data["department_id"]
+                    )
+                except Department.DoesNotExist:
+                    return JsonResponse(
+                        {"error": "Department not found"},
+                        status=404,
+                    )
             user.save()
 
             return JsonResponse({"message": "user updated successfully"})
@@ -186,8 +180,8 @@ def update_user(request, pk):
 def delete_user(request, pk):
     if request.method == "DELETE":
         try:
+            User.delete()
             user = User.objects.get(pk=pk)
-            user.delete()
 
             return JsonResponse({
                 "message": "user deleted successfully"
@@ -197,6 +191,7 @@ def delete_user(request, pk):
             return JsonResponse({"error": "user not found"}, status=404)
 
     return JsonResponse({"error": "DELETE method required"}, status=405)
+
 
 
 
