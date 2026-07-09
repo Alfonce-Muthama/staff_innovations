@@ -22,6 +22,7 @@ urlpatterns = [
     path('', include('users.urls')),
     path('', include('Gamification.urls')),
     path('', include('ideas.urls')),
+    path('', include('projects.urls')),
 
 
 ]

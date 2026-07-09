@@ -12,6 +12,7 @@ class User(BaseModel):
     role = models.CharField(max_length=100,null=True, blank=True)
     department_id = models.ForeignKey('Department', on_delete=models.CASCADE, blank=False, null=True)
     date_joined = models.DateTimeField(auto_now_add=True)
+    points = models.IntegerField(default=0,null=True, blank=True)
 
 
 

@@ -25,7 +25,13 @@ SECRET_KEY = 'django-insecure-xv8&89d1%6d0r4a$e^1=@d&fmjgjhwo44b1x7r)&geuwer$7@j
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['vacant-grime-headrest.ngrok-free.dev',
+                 '127.0.0.1',
+
+]
+CSRF_TRUSTED_ORIGINS = [
+    "https://vacant-grime-headrest.ngrok-free.dev",
+]
 
 
 # Application definition
@@ -43,6 +49,7 @@ INSTALLED_APPS = [
     'projects',
     'Transaction_Log_Base',
     'Gamification',
+
 ]
 
 MIDDLEWARE = [
