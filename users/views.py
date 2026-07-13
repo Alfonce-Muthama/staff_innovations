@@ -3,6 +3,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.hashers import make_password, check_password
 from .models import User,Department
 from .decorators import jwt_required,role_required
+from Transaction_Log_Base.services import AuditLogger
 import jwt
 import datetime
 from django.conf import settings
@@ -13,7 +14,13 @@ from django.http import HttpRequest, HttpResponse
 @csrf_exempt
 def create_user(request):
     if request.method == "POST":
-        data = json.loads(request.body)
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse(
+                {"error": "Invalid JSON in request body"},
+                status=400
+            )
 
         # Username
         if not data.get("username"):
@@ -70,7 +77,16 @@ def create_user(request):
             first_name=data["first_name"],
             last_name=data["last_name"],
             role=data["role"],
-            department_id=Department.objects.get(id=data["department_id"])
+            department_id=department
+        )
+        AuditLogger.log(
+            request=request,
+            user=request.user,
+            event_type="USER_CREATED",
+            message=f"User '{user.username}' was created.",
+            entity_type="User",
+            entity_id=user.id,
+            entity_name=user.username,
         )
 
         return JsonResponse({
@@ -88,7 +104,13 @@ def login_user(request: HttpRequest):
 
     try:
         data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse(
+            {"error": "Invalid JSON in request body"},
+            status=400,
+        )
 
+    try:
         user = User.objects.get(username=data["username"])
 
         if not check_password(data["password"], user.password):
@@ -124,6 +146,15 @@ def login_user(request: HttpRequest):
             secure=False,
             max_age=30 * 60,
         )
+        AuditLogger.log(
+            request=request,
+            user=user,
+            event_type="LOGIN",
+            message=f"{user.username} logged in successfully",
+            entity_type=user,
+            entity_id=user.id,
+            entity_name=user.username,
+        )
 
         return response
 
@@ -135,13 +166,19 @@ def login_user(request: HttpRequest):
 # UPDATE
 @csrf_exempt
 @jwt_required
-@role_required
+@role_required(["User"])
 def update_user(request, pk):
     if request.method == "PUT":
         try:
-            user = User.objects.get(pk=pk)
             data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse(
+                {"error": "Invalid JSON in request body"},
+                status=400,
+            )
 
+        try:
+            user = User.objects.get(pk=pk)
             user.username = data.get("username", user.username)
             user.email = data.get("email", user.email)
             if data.get("password"):
@@ -160,6 +197,17 @@ def update_user(request, pk):
                         status=404,
                     )
             user.save()
+            user.save()
+
+            AuditLogger.log(
+                request=request,
+                user=request.user,
+                event_type="UPDATE_USER",
+                message=f"Updated user '{user.username}'",
+                entity_type="User",
+                entity_id=user.id,
+                entity_name=user.username,
+            )
 
             return JsonResponse({"message": "user updated successfully"})
 
@@ -172,17 +220,25 @@ def update_user(request, pk):
     return JsonResponse({"error": "PUT method required"}, status=405)
 
 
-
 #DELETE
 @csrf_exempt
 @jwt_required
-@role_required
+@role_required(["User"])
 def delete_user(request, pk):
     if request.method == "DELETE":
         try:
-            User.delete()
             user = User.objects.get(pk=pk)
+            AuditLogger.log(
+                request=request,
+                user=request.user,  # or the authenticated user object
+                event_type="DELETE_USER",
+                message=f"Deleted user '{user.username}'",
+                entity_type="User",
+                entity_id=user.id,
+                entity_name=user.username,
+            )
 
+            user.delete()
             return JsonResponse({
                 "message": "user deleted successfully"
             })

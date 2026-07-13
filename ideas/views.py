@@ -1,9 +1,11 @@
 from django.http import JsonResponse
+from django.template.defaultfilters import title
 from django.views.decorators.csrf import csrf_exempt
 from users.decorators import jwt_required,role_required
 from users.models import User
 from .models import Idea
 from .services import create_idea
+from Transaction_Log_Base.services import AuditLogger
 import json
 from .services import (
     submit_idea as submit_idea_service,
@@ -16,6 +18,7 @@ from .services import (
 
 @csrf_exempt
 @jwt_required
+@role_required(["User"])
 def create_new_idea(request):
     if request.method != "POST":
         return JsonResponse({"error": "POST method required"}, status=405)
@@ -41,6 +44,15 @@ def create_new_idea(request):
             user=user,
             title=title,
             description=description
+        )
+        AuditLogger.log(
+            request=request,
+            user=user,
+            event_type="CREATE_IDEA",
+            message=f"Idea '{idea.title}' created.",
+            entity_type="Idea",
+            entity_id=idea.id,
+            entity_name=idea.title,
         )
         return JsonResponse({
             "message": "Idea created successfully",
@@ -113,6 +125,7 @@ def idea_detail(request, pk):
 
 @csrf_exempt
 @jwt_required
+@role_required(["User"])
 def update_idea(request, pk):
 
     if request.method != "PUT":
@@ -149,6 +162,19 @@ def update_idea(request, pk):
             idea.description
         )
         idea.save()
+        actor = User.objects.get(id=request.user_id)
+
+        AuditLogger.log(
+            request=request,
+            user=actor,
+            event_type="UPDATE_IDEA",
+            message=f"Idea '{idea.title}' was updated.",
+            entity_type="Idea",
+            entity_id=idea.id,
+            entity_name=idea.title,
+        )
+
+
         return JsonResponse({
             "message":
             "Idea updated successfully"
@@ -191,6 +217,15 @@ def delete_idea(request, pk):
                 "Only Draft ideas can be deleted."
 
             }, status=400)
+        AuditLogger.log(
+            request=request,
+            user=User.objects.get(id=request.user_id),
+            event_type="DELETE_IDEA",
+            message=f"Idea '{idea.title}' was deleted",
+            entity_type="Idea",
+            entity_id=idea.id,
+            entity_name=idea.title,
+        )
 
         idea.delete()
         return JsonResponse({
@@ -225,6 +260,15 @@ def submit_idea(request, pk):
                 status=400,
             )
         submit_idea_service(idea)
+        AuditLogger.log(
+            request=request,
+            user=idea.creator,
+            event_type="IDEA_SUBMITTED",
+            message=f"Idea '{idea.title}' was submitted.",
+            entity_type="Idea",
+            entity_id=idea.id,
+            entity_name=idea.title,
+        )
         return JsonResponse({
             "message": "Idea submitted successfully",
             "status": idea.status,
@@ -246,6 +290,15 @@ def add_comment(request, pk):
         idea = Idea.objects.get(id=pk)
         user = User.objects.get(id=request.user_id)
         comment = add_comment_service(user, idea, text)
+        AuditLogger.log(
+            request=request,
+            user=user,
+            event_type="IDEA_COMMENTED",
+            message=f"Comment added to idea '{idea.title}'.",
+            entity_type="IdeaComment",
+            entity_id=comment.id,
+            entity_name=idea.title,
+        )
         return JsonResponse({
             "message": "Comment added",
             "comment_id": str(comment.id),
@@ -263,6 +316,15 @@ def like_idea(request, pk):
         idea = Idea.objects.get(id=pk)
         user = User.objects.get(id=request.user_id)
         like_idea_service(user, idea)
+        AuditLogger.log(
+            request=request,
+            user=user,
+            event_type="LIKE_IDEA",
+            message=f"{user.username} liked '{idea.title}'",
+            entity_type="Idea",
+            entity_id=idea.id,
+            entity_name=idea.title,
+        )
         return JsonResponse({
             "message": "Vote recorded",
             "likes": idea.likes,
@@ -310,6 +372,15 @@ def approve_idea(request, pk):
             review_comment=data.get("review_comment", ""),
             product_manager=User.objects.get(id=request.user_id),
         )
+        AuditLogger.log(
+            request=request,
+            user=User.objects.get(id=request.user_id),
+            event_type="APPROVE_IDEA",
+            message=f"Approved idea '{idea.title}' and created project '{project.project_name}'",
+            entity_type="Idea",
+            entity_id=idea.id,
+            entity_name=idea.title,
+        )
         return JsonResponse({
             "message": "Idea approved successfully",
             "project_id": str(project.id),
@@ -333,6 +404,15 @@ def reject_idea(request, pk):
         reject_idea_service(
             idea,
             data.get("review_comment", "")
+        )
+        AuditLogger.log(
+            request=request,
+            user=User.objects.get(id=request.user_id),
+            event_type="IDEA_REJECTED",
+            message=f"Idea '{idea.title}' was rejected.",
+            entity_type="Idea",
+            entity_id=idea.id,
+            entity_name=idea.title,
         )
 
         return JsonResponse({
