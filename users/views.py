@@ -1,74 +1,86 @@
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.hashers import make_password, check_password
-from .models import User,Department
+from .models import User,Department, Role
 from .decorators import jwt_required,role_required
 from Transaction_Log_Base.services import AuditLogger
+from Transaction_Log_Base.models import EventType, TransactionLogBase
 import jwt
 import datetime
 from django.conf import settings
 import json
 from django.http import HttpRequest, HttpResponse
 
-# CREATE USER
+#CREATE USER
 @csrf_exempt
+@jwt_required
+@role_required(["Admin"])
 def create_user(request):
-    if request.method == "POST":
-        try:
-            data = json.loads(request.body)
-        except json.JSONDecodeError:
+
+    if request.method != "POST":
+        return JsonResponse(
+            {"error": "POST method required"},
+            status=405
+        )
+
+    try:
+        data = json.loads(request.body)
+
+        required_fields = [
+            "username",
+            "email",
+            "password",
+            "first_name",
+            "last_name",
+            "role",
+            "department_id",
+        ]
+
+        for field in required_fields:
+            if not data.get(field):
+                return JsonResponse(
+                    {"error": f"{field} is required"},
+                    status=400
+                )
+
+        if User.objects.filter(username=data["username"]).exists():
             return JsonResponse(
-                {"error": "Invalid JSON in request body"},
+                {"error": "Username already exists"},
                 status=400
             )
 
-        # Username
-        if not data.get("username"):
-            return JsonResponse({"error": "Username is required."}, status=400)
-        # Email
-        if not data.get("email"):
-            return JsonResponse({"error": "Email is required."}, status=400)
-
-        # Password
-        if not data.get("password"):
-            return JsonResponse({"error": "Password is required."}, status=400)
-
-        # First Name
-        if not data.get("first_name"):
-            return JsonResponse({"error": "First name is required."}, status=400)
-
-        # Last Name
-        if not data.get("last_name"):
-            return JsonResponse({"error": "Last name is required."}, status=400)
-
-        # Role
-        if not data.get("role"):
-            return JsonResponse({"error": "Role is required."}, status=400)
-
-        # Department
-        if not data.get("department_id"):
-            return JsonResponse({"error": "Department is required."}, status=400)
-
-        # Check if username already exists
-        if User.objects.filter(username=data["username"]).exists():
-            return JsonResponse({"error": "Username already exists."}, status=400)
-
-        # Check if email already exists
         if User.objects.filter(email=data["email"]).exists():
-            return JsonResponse({"error": "Email already exists."}, status=400)
+            return JsonResponse(
+                {"error": "Email already exists"},
+                status=400
+            )
 
-        # Check password length
         if len(data["password"]) < 8:
             return JsonResponse(
-                {"error": "Password must be at least 8 characters long."},
+                {
+                    "error": "Password must be at least 8 characters long."
+                },
                 status=400
             )
 
-        # Check department exists
         try:
-            department = Department.objects.get(id=data["department_id"])
+            department = Department.objects.get(
+                id=data["department_id"]
+            )
+
         except Department.DoesNotExist:
-            return JsonResponse({"error": "Department not found."}, status=404)
+            return JsonResponse(
+                {"error": "Department not found"},
+                status=404
+            )
+
+        try:
+            role = Role.objects.get(name=data["role"])
+        except Role.DoesNotExist:
+            return JsonResponse(
+                {"error": "Role not found"},
+                status=404
+            )
 
         user = User.objects.create(
             username=data["username"],
@@ -76,53 +88,105 @@ def create_user(request):
             password=make_password(data["password"]),
             first_name=data["first_name"],
             last_name=data["last_name"],
-            role=data["role"],
-            department_id=department
-        )
-        AuditLogger.log(
-            request=request,
-            user=request.user,
-            event_type="USER_CREATED",
-            message=f"User '{user.username}' was created.",
-            entity_type="User",
-            entity_id=user.id,
-            entity_name=user.username,
+            role=role,
+            department_id=department,
         )
 
-        return JsonResponse({
-            "message": "User created successfully",
-            "id": str(user.id)
-        }, status=201)
+        try:
 
-    return JsonResponse({"error": "POST method required"}, status=405)
+            event_type = EventType.objects.get(
+                name="USER_CREATED"
+            )
+
+            AuditLogger.log(
+                request=request,
+
+                # Logged-in Admin
+                user=request.user,
+
+                event_type=event_type,
+
+                message=f"{request.user.username} created user '{user.username}'.",
+
+                entity_type="User",
+
+                entity_id=user.id,
+
+                entity_name=user.username,
+            )
+
+        except EventType.DoesNotExist:
+            pass
+
+        return JsonResponse(
+            {
+                "message": "User created successfully.",
+                "id": str(user.id),
+            },
+            status=201,
+        )
+
+    except json.JSONDecodeError:
+        return JsonResponse(
+            {"error": "Invalid JSON."},
+            status=400,
+        )
+
+    except Exception as e:
+        return JsonResponse(
+            {
+                "error": f"User failed to create. {str(e)}"
+            },
+            status=500,
+        )
+
 
 # LOGIN USER
 @csrf_exempt
 def login_user(request: HttpRequest):
-    if request.method != "POST":
-        return JsonResponse({"error": "POST method required"}, status=405)
 
-    try:
-        data = json.loads(request.body)
-    except json.JSONDecodeError:
+    if request.method != "POST":
         return JsonResponse(
-            {"error": "Invalid JSON in request body"},
-            status=400,
+            {"error": "POST method required"},
+            status=405
         )
 
     try:
-        user = User.objects.get(username=data["username"])
+        data = json.loads(request.body)
 
-        if not check_password(data["password"], user.password):
-            return JsonResponse({"error": "Invalid password"}, status=401)
+        username = data.get("username")
+        password = data.get("password")
+
+        if not username:
+            return JsonResponse(
+                {"error": "Username is required"},
+                status=400
+            )
+
+        if not password:
+            return JsonResponse(
+                {"error": "Password is required"},
+                status=400
+            )
+
+        user = User.objects.select_related("role").get(
+            username=username
+        )
+
+        if not check_password(password, user.password):
+            return JsonResponse(
+                {"error": "Invalid password"},
+                status=401
+            )
 
         payload = {
             "user_id": str(user.id),
             "username": user.username,
-            "role": user.role,
+            "role": user.role.name if user.role else None,
             "iat": datetime.datetime.now(datetime.UTC),
             "exp": datetime.datetime.now(datetime.UTC)
                    + datetime.timedelta(minutes=30),
+
         }
 
         token = jwt.encode(
@@ -131,42 +195,64 @@ def login_user(request: HttpRequest):
             algorithm="HS256"
         )
 
-        response = JsonResponse({
-            "message": "Login successful",
-            "token": token,
-            "username": user.username,
-            "role": user.role,
-        })
+        response = JsonResponse(
+            {
+                "message": "Login successful",
+                "token": token,
+                "username": user.username,
+                "role": user.role.name if user.role else None,
+            }
+        )
 
         response.set_cookie(
             key="jwt",
             value=token,
             httponly=True,
+            secure=False,        # True in production
             samesite="Lax",
-            secure=False,
-            max_age=30 * 60,
+            max_age=30 * 60
         )
-        AuditLogger.log(
-            request=request,
-            user=user,
-            event_type="LOGIN",
-            message=f"{user.username} logged in successfully",
-            entity_type=user,
-            entity_id=user.id,
-            entity_name=user.username,
-        )
+
+        try:
+            event_type = EventType.objects.get(name="LOGIN")
+
+            AuditLogger.log(
+                request=request,
+                user=user,
+                event_type=event_type,
+                message=f"{user.username} logged into the system.",
+                entity_type="User",
+                entity_id=user.id,
+                entity_name=user.username,
+            )
+
+        except EventType.DoesNotExist:
+            pass
 
         return response
 
     except User.DoesNotExist:
-        return JsonResponse({"error": "User not found"}, status=404)
-    except (KeyError, json.JSONDecodeError):
-        return JsonResponse({"error": "Invalid request body"}, status=400)
+        return JsonResponse(
+            {"error": "User not found"},
+            status=404
+        )
+
+    except json.JSONDecodeError:
+        return JsonResponse(
+            {"error": "Invalid JSON"},
+            status=400
+        )
+
+    except Exception as e:
+        return JsonResponse(
+            {"error": str(e)},
+            status=500
+        )
 
 # UPDATE
 @csrf_exempt
 @jwt_required
-@role_required(["User"])
+@role_required(["Admin"])
 def update_user(request, pk):
     if request.method == "PUT":
         try:
@@ -185,7 +271,15 @@ def update_user(request, pk):
                 user.password = make_password(data["password"])
             user.first_name = data.get("first_name", user.first_name)
             user.last_name = data.get("last_name", user.last_name)
-            user.role = data.get("role", user.role)
+            if "role" in data:
+                try:
+                    role = Role.objects.get(name=data["role"])
+                    user.role = role
+                except Role.DoesNotExist:
+                    return JsonResponse(
+                        {"error": "Role not found"},
+                        status=404
+                    )
             if "department_id" in data:
                 try:
                     user.department_id = Department.objects.get(
@@ -199,10 +293,11 @@ def update_user(request, pk):
             user.save()
             user.save()
 
+            event_type = EventType.objects.get(name="User Updated")
             AuditLogger.log(
                 request=request,
                 user=request.user,
-                event_type="UPDATE_USER",
+                event_type=event_type,
                 message=f"Updated user '{user.username}'",
                 entity_type="User",
                 entity_id=user.id,
@@ -223,15 +318,17 @@ def update_user(request, pk):
 #DELETE
 @csrf_exempt
 @jwt_required
-@role_required(["User"])
+@role_required(["Admin"])
 def delete_user(request, pk):
     if request.method == "DELETE":
         try:
             user = User.objects.get(pk=pk)
+
+            event_type = EventType.objects.get(name="User Deleted")
             AuditLogger.log(
                 request=request,
                 user=request.user,  # or the authenticated user object
-                event_type="DELETE_USER",
+                event_type=event_type,
                 message=f"Deleted user '{user.username}'",
                 entity_type="User",
                 entity_id=user.id,

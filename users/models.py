@@ -1,5 +1,5 @@
 from django.db import models
-from Base.models import BaseModel
+from Base.models import BaseModel,GenericBaseModel
 
 
 
@@ -22,12 +22,11 @@ class Department(BaseModel):
 
 
 
-class Role(BaseModel):
-    description_name = models.TextField(null=True, blank=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
+class Role(GenericBaseModel):
     def __str__(self):
-        return self.description_name
+        return self.name
+
+
 
 
 

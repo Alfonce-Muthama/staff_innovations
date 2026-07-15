@@ -26,7 +26,7 @@ class BaseModel(models.Model):
 
 
 class GenericBaseModel(BaseModel):
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=100, null=True, blank=True)
     description = models.TextField(blank=True, null=True)
 
     class Meta:

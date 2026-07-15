@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import TransactionLogBase, Notifications, MpesaTransactionCost
+from .models import TransactionLogBase, Notifications, MpesaTransactionCost, EventType
 
 # Register your models here.
 # admin.site.register(TransactionLogBase)
@@ -8,7 +8,7 @@ from .models import TransactionLogBase, Notifications, MpesaTransactionCost
 admin.site.register(Notifications)
 
 admin.site.register(MpesaTransactionCost)
-
+admin.site.register(EventType)
 
 # admin.site.register(User)
 @admin.register(TransactionLogBase)
