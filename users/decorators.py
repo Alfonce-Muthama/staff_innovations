@@ -45,7 +45,7 @@ def jwt_required(view_func):
             request.username = user.username
 
             if user.role:
-                request.role = user.role.role_name if user.role else None
+                request.role = user.role.name if user.role else None
             else:
                 request.role = None
 

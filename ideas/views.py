@@ -6,6 +6,7 @@ from users.models import User
 from .models import Idea
 from .services import create_idea
 from Transaction_Log_Base.services import AuditLogger
+from Transaction_Log_Base.models import EventType
 import json
 from .services import (
     submit_idea as submit_idea_service,
@@ -18,7 +19,7 @@ from .services import (
 
 @csrf_exempt
 @jwt_required
-@role_required(["User"])
+@role_required(["Admin"])
 def create_new_idea(request):
     if request.method != "POST":
         return JsonResponse({"error": "POST method required"}, status=405)
@@ -45,10 +46,12 @@ def create_new_idea(request):
             title=title,
             description=description
         )
+        event_type = EventType.objects.get(name="IDEA_CREATED")
+
         AuditLogger.log(
             request=request,
             user=user,
-            event_type="CREATE_IDEA",
+            event_type=event_type,
             message=f"Idea '{idea.title}' created.",
             entity_type="Idea",
             entity_id=idea.id,
@@ -125,7 +128,7 @@ def idea_detail(request, pk):
 
 @csrf_exempt
 @jwt_required
-@role_required(["User"])
+@role_required(["Admin"])
 def update_idea(request, pk):
 
     if request.method != "PUT":
@@ -164,10 +167,11 @@ def update_idea(request, pk):
         idea.save()
         actor = User.objects.get(id=request.user_id)
 
+        event_type = EventType.objects.get(name="IDEA_UPDATED")
         AuditLogger.log(
             request=request,
             user=actor,
-            event_type="UPDATE_IDEA",
+            event_type=event_type,
             message=f"Idea '{idea.title}' was updated.",
             entity_type="Idea",
             entity_id=idea.id,
@@ -196,6 +200,7 @@ def update_idea(request, pk):
 
 @csrf_exempt
 @jwt_required
+@role_required(["Admin"])
 def delete_idea(request, pk):
     if request.method != "DELETE":
         return JsonResponse({
@@ -205,11 +210,17 @@ def delete_idea(request, pk):
 
     try:
         idea = Idea.objects.get(id=pk)
-        if str(idea.creator.id) != request.user_id:
-            return JsonResponse({
-                "error":
-                "Permission denied"
-            }, status=403)
+
+        current_user = User.objects.select_related("role").get(id=request.user_id)
+
+        is_creator = str(idea.creator.id) == request.user_id
+        is_admin = current_user.role and current_user.role.name == "Admin"
+
+        if not (is_creator or is_admin):
+            return JsonResponse(
+                {"error": "Permission denied"},
+                status=403,
+            )
 
         if idea.status != "Draft":
             return JsonResponse({
@@ -217,10 +228,12 @@ def delete_idea(request, pk):
                 "Only Draft ideas can be deleted."
 
             }, status=400)
+
+        event_type = EventType.objects.get(name="IDEA_DELETED")
         AuditLogger.log(
             request=request,
             user=User.objects.get(id=request.user_id),
-            event_type="DELETE_IDEA",
+            event_type=event_type,
             message=f"Idea '{idea.title}' was deleted",
             entity_type="Idea",
             entity_id=idea.id,
@@ -260,10 +273,12 @@ def submit_idea(request, pk):
                 status=400,
             )
         submit_idea_service(idea)
+
+        event_type = EventType.objects.get(name="IDEA_SUBMITTED")
         AuditLogger.log(
             request=request,
             user=idea.creator,
-            event_type="IDEA_SUBMITTED",
+            event_type=event_type,
             message=f"Idea '{idea.title}' was submitted.",
             entity_type="Idea",
             entity_id=idea.id,
@@ -290,10 +305,12 @@ def add_comment(request, pk):
         idea = Idea.objects.get(id=pk)
         user = User.objects.get(id=request.user_id)
         comment = add_comment_service(user, idea, text)
+
+        event_type = EventType.objects.get(name="IDEA_COMMENTED")
         AuditLogger.log(
             request=request,
             user=user,
-            event_type="IDEA_COMMENTED",
+            event_type=event_type,
             message=f"Comment added to idea '{idea.title}'.",
             entity_type="IdeaComment",
             entity_id=comment.id,
@@ -316,10 +333,12 @@ def like_idea(request, pk):
         idea = Idea.objects.get(id=pk)
         user = User.objects.get(id=request.user_id)
         like_idea_service(user, idea)
+
+        event_type = EventType.objects.get(name="LIKE_IDEA")
         AuditLogger.log(
             request=request,
             user=user,
-            event_type="LIKE_IDEA",
+            event_type=event_type,
             message=f"{user.username} liked '{idea.title}'",
             entity_type="Idea",
             entity_id=idea.id,
@@ -344,6 +363,17 @@ def dislike_idea(request, pk):
         idea = Idea.objects.get(id=pk)
         user = User.objects.get(id=request.user_id)
         dislike_idea_service(user, idea)
+
+        event_type = EventType.objects.get(name="DISLIKE_IDEA")
+        AuditLogger.log(
+            request=request,
+            user=user,
+            event_type=event_type,
+            message=f"{user.username} disliked '{idea.title}'",
+            entity_type="Idea",
+            entity_id=idea.id,
+            entity_name=idea.title,
+        )
         return JsonResponse({
             "message": "Vote recorded",
             "dislikes": idea.dislikes,
@@ -372,10 +402,12 @@ def approve_idea(request, pk):
             review_comment=data.get("review_comment", ""),
             product_manager=User.objects.get(id=request.user_id),
         )
+
+        event_type = EventType.objects.get(name="IDEA_APPROVED")
         AuditLogger.log(
             request=request,
             user=User.objects.get(id=request.user_id),
-            event_type="APPROVE_IDEA",
+            event_type=event_type,
             message=f"Approved idea '{idea.title}' and created project '{project.project_name}'",
             entity_type="Idea",
             entity_id=idea.id,
@@ -405,10 +437,12 @@ def reject_idea(request, pk):
             idea,
             data.get("review_comment", "")
         )
+
+        event_type = EventType.objects.get(name="IDEA_REJECTED")
         AuditLogger.log(
             request=request,
             user=User.objects.get(id=request.user_id),
-            event_type="IDEA_REJECTED",
+            event_type=event_type,
             message=f"Idea '{idea.title}' was rejected.",
             entity_type="Idea",
             entity_id=idea.id,

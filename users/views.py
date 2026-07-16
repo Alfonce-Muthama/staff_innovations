@@ -210,12 +210,11 @@ def login_user(request: HttpRequest):
             httponly=True,
             secure=False,        # True in production
             samesite="Lax",
-            max_age=30 * 60
+            max_age=60 * 60
         )
 
         try:
             event_type = EventType.objects.get(name="LOGIN")
-
             AuditLogger.log(
                 request=request,
                 user=user,
@@ -293,7 +292,7 @@ def update_user(request, pk):
             user.save()
             user.save()
 
-            event_type = EventType.objects.get(name="User Updated")
+            event_type = EventType.objects.get(name="USER_UPDATED")
             AuditLogger.log(
                 request=request,
                 user=request.user,
@@ -324,7 +323,7 @@ def delete_user(request, pk):
         try:
             user = User.objects.get(pk=pk)
 
-            event_type = EventType.objects.get(name="User Deleted")
+            event_type = EventType.objects.get(name="USER_DELETED")
             AuditLogger.log(
                 request=request,
                 user=request.user,  # or the authenticated user object

@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from pathlib import Path
+from urllib.request import localhost
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -26,7 +27,7 @@ SECRET_KEY = 'django-insecure-xv8&89d1%6d0r4a$e^1=@d&fmjgjhwo44b1x7r)&geuwer$7@j
 DEBUG = True
 
 ALLOWED_HOSTS = ['vacant-grime-headrest.ngrok-free.dev',
-                 '127.0.0.1',
+                 '127.0.0.1', 'localhost', '192.168.1.35'
 
 ]
 CSRF_TRUSTED_ORIGINS = [
@@ -49,10 +50,23 @@ INSTALLED_APPS = [
     'projects',
     'Transaction_Log_Base',
     'Gamification',
+    'corsheaders',
 
 ]
+CORS_ORIGIN_ALLOW_ALL = True
+
+CORS_ALLOW_CREDENTIALS = True
+
+#cookies configuration
+SESSION_COOKIE_SAMESITE = "None"
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+CRSF_COOKIE_SAMESITE = "None"
+
+
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
