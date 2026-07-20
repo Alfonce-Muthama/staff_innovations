@@ -19,7 +19,7 @@ from .services import (
 
 @csrf_exempt
 @jwt_required
-@role_required(["Admin"])
+@role_required(["Admin", "Product Manager"])
 def create_new_idea(request):
     if request.method != "POST":
         return JsonResponse({"error": "POST method required"}, status=405)
@@ -395,11 +395,16 @@ def approve_idea(request, pk):
     try:
         idea = Idea.objects.get(id=pk)
         data = json.loads(request.body)
+
+        print("REQUEST DATA:", data)
+        print("Priority:", data.get("priority"))
+        print("Due date:", data.get("due_date"))
+        print("Comment:", data.get("review_comment"))
         project = approve_idea_service(
             idea=idea,
-            priority=data["priority"],
-            due_date=data["due_date"],
-            review_comment=data.get("review_comment", ""),
+            priority=data.get("priority"),
+            due_date = data.get("due_date"),
+            review_comment = data.get("review_comment"),
             product_manager=User.objects.get(id=request.user_id),
         )
 

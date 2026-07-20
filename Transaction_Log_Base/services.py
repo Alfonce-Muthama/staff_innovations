@@ -16,7 +16,6 @@ class AuditLogger:
                 user_ip_address=request.META.get("REMOTE_ADDR"),
                 event_type=event_type,
                 event_message=message,
-                event_date=timezone.now().date(),
                 triggered_by=user,
                 entity_type=entity_type,
                 entity_id=str(entity_id) if entity_id else None,

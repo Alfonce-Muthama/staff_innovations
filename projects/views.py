@@ -3,13 +3,14 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.dateparse import parse_date
 import json
 from Transaction_Log_Base.services import AuditLogger
-from users.decorators import role_required
+from users.decorators import jwt_required,role_required
 from .models import Project, ProjectPhase, Task
 from users.models import User
 from .services import complete_task
 
 
 @csrf_exempt
+@jwt_required
 @role_required(["Product Manager"])
 def create_phase(request, project_id):
     if request.method != "POST":
@@ -37,6 +38,8 @@ def create_phase(request, project_id):
 
 
 @csrf_exempt
+@jwt_required
+@role_required(["Product Manager"])
 def create_task(request, phase_id):
     if request.method != "POST":
         return JsonResponse({"error": "POST method required"}, status=405)
@@ -66,6 +69,8 @@ def create_task(request, phase_id):
 
 
 @csrf_exempt
+@jwt_required
+@role_required(["Product Manager"])
 def mark_task_complete(request, task_id):
     if request.method != "POST":
         return JsonResponse({"error": "POST method required"}, status=405)
@@ -86,6 +91,8 @@ def mark_task_complete(request, task_id):
 
 
 @csrf_exempt
+@jwt_required
+@role_required(["Product Manager"])
 def list_projects(request):
     if request.method != "GET":
         return JsonResponse({"error": "GET method required"}, status=405)
@@ -102,6 +109,7 @@ def list_projects(request):
 
 
 @csrf_exempt
+@jwt_required
 def project_detail(request, pk):
     try:
         p = Project.objects.get(pk=pk)
@@ -117,6 +125,8 @@ def project_detail(request, pk):
 
 
 @csrf_exempt
+@jwt_required
+@role_required(["Product Manager"])
 def update_project(request, pk):
     if request.method != "PUT":
         return JsonResponse({"error": "PUT method required"}, status=405)
@@ -146,6 +156,8 @@ def update_project(request, pk):
 
 
 @csrf_exempt
+@jwt_required
+@role_required(["Product Manager"])
 def delete_project(request, pk):
     if request.method != "DELETE":
         return JsonResponse({"error": "DELETE method required"}, status=405)

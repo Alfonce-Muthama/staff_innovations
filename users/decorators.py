@@ -34,7 +34,7 @@ def jwt_required(view_func):
                 algorithms=["HS256"]
             )
 
-            # Retrieve the logged in user
+            # Retrieve the logged_in user
             user = User.objects.select_related("role").get(
                 id=payload["user_id"]
             )

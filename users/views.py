@@ -1,15 +1,24 @@
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.hashers import make_password, check_password
-from .models import User,Department, Role
 from .decorators import jwt_required,role_required
 from Transaction_Log_Base.services import AuditLogger
-from Transaction_Log_Base.models import EventType, TransactionLogBase
+from Transaction_Log_Base.models import EventType,TransactionLogBase, Notifications
 import jwt
 import datetime
 from django.conf import settings
 import json
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest
+from django.db.models import Count, Avg
+from users.models import User, Role, Department
+from ideas.models import Idea
+from projects.models import Project,Task,ProjectPhase
+from django.utils import timezone
+from Gamification.models import Badge,UserBadge,PointRule,PointHistory
+
+
+
+
 
 #CREATE USER
 @csrf_exempt
@@ -346,5 +355,285 @@ def delete_user(request, pk):
 
 
 
+ #The dashboard
+@jwt_required
+@role_required(["Admin"])
+def dashboard(request):
+
+    dashboard = {}
+
+# USERS
+    dashboard["users"] = {
+        "total_users": User.objects.count(),
+
+        "active_users": User.objects.filter(
+            state__name="Active"
+        ).count(),
+
+        "roles": list(
+            Role.objects.annotate(
+                total=Count("user")
+            ).values(
+                "name",
+                "total"
+            )
+        ),
+
+        "departments": list(
+            Department.objects.annotate(
+                total=Count("user")
+            ).values(
+                "department_name",
+                "total"
+            )
+        )
+    }
+
+# IDEAS
+    dashboard["ideas"] = {
+
+        "total": Idea.objects.count(),
+
+        "draft": Idea.objects.filter(
+            status="Draft"
+        ).count(),
+
+        "submitted": Idea.objects.filter(
+            status="Submitted"
+        ).count(),
+
+        "peer_review": Idea.objects.filter(
+            status="Peer Review"
+        ).count(),
+
+        "pm_review": Idea.objects.filter(
+            status="Product Manager Review"
+        ).count(),
+
+        "approved": Idea.objects.filter(
+            status="Approved"
+        ).count(),
+
+        "rejected": Idea.objects.filter(
+            status="Rejected"
+        ).count(),
+
+        "implementation": Idea.objects.filter(
+            status="Implementation"
+        ).count(),
+
+        "impact": Idea.objects.filter(
+            status="Impact Evaluation"
+        ).count(),
+
+        "archived": Idea.objects.filter(
+            status="Archived"
+        ).count()
+    }
+
+# PROJECTS
+    dashboard["projects"] = {
+
+        "total": Project.objects.count(),
+
+        "completed": Project.objects.filter(
+            progress=100
+        ).count(),
+
+        "ongoing": Project.objects.filter(
+            progress__lt=100
+        ).count(),
+
+        "overdue": Project.objects.filter(
+            progress__lt=100,
+            end_date__lt=timezone.localdate()
+        ).count(),
+
+        "average_progress":
+            Project.objects.aggregate(
+                Avg("progress")
+            )["progress__avg"] or 0
+    }
+
+# TASKS
+    dashboard["tasks"] = {
+
+        "total": Task.objects.count(),
+
+        "completed": Task.objects.filter(
+            is_completed=True
+        ).count(),
+
+        "pending": Task.objects.filter(
+            is_completed=False
+        ).count(),
+
+        "overdue": Task.objects.filter(
+            is_completed=False,
+            due_date__lt=timezone.localdate()
+        ).count()
+    }
+
+# GAMIFICATION
+    dashboard["gamification"] = {
+
+        "top_contributors": list(
+
+            User.objects.order_by(
+                "-points"
+            ).values(
+                "username",
+                "points"
+            )[:10]
+
+        ),
+
+        "points_awarded":
+
+            PointHistory.objects.aggregate(
+                total=Count("id")
+            )["total"]
+    }
+
+# AUDIT LOGS
+    dashboard["audit_logs"] = {
+
+        "total_logs":
+            TransactionLogBase.objects.count(),
+
+        "today":
+
+            TransactionLogBase.objects.filter(
+                event_date=timezone.localdate()
+            ).count(),
+
+        "recent":
+
+            list(
+
+                TransactionLogBase.objects.select_related(
+                    "event_type",
+                    "triggered_by"
+                ).order_by(
+                    "-created_at"
+                ).values(
+
+                    "created_at",
+                    "event_message",
+                    "event_type__name",
+                    "triggered_by__username"
+
+                )[:10]
+            )
+    }
+
+# NOTIFICATIONS
+
+    dashboard["notifications"] = {
+
+        "total":
+
+            Notifications.objects.count(),
+
+        "unread":
+
+            Notifications.objects.filter(
+                read_at=None
+            ).count(),
+
+        "latest":
+
+            list(
+
+                Notifications.objects.select_related(
+                    "recipient"
+                ).order_by(
+                    "-created_at"
+                ).values(
+
+                    "recipient__username",
+                    "created_at"
+
+                )[:10]
+            )
+    }
+
+# CHARTS
+    dashboard["charts"] = {
+
+        "idea_status_distribution": [
+
+            {
+                "label": x["status"],
+                "value": x["total"]
+            }
+
+            for x in
+
+            Idea.objects.values(
+                "status"
+            ).annotate(
+                total=Count("id")
+            )
+        ],
+
+        "role_distribution": [
+
+            {
+                "label": x["role__name"],
+                "value": x["total"]
+            }
+
+            for x in
+
+            User.objects.values(
+                "role__name"
+            ).annotate(
+                total=Count("id")
+            )
+        ],
+
+        "department_distribution": [
+
+            {
+                "label": x["department_id__department_name"],
+                "value": x["total"]
+            }
+
+            for x in
+
+            User.objects.values(
+                "department_id__department_name"
+            ).annotate(
+                total=Count("id")
+            )
+        ],
+
+        "leaderboard":
+
+            list(
+
+                User.objects.order_by(
+                    "-points"
+                ).values(
+
+                    "username",
+                    "points"
+
+                )[:10]
+            ),
+
+        "project_progress":
+
+            list(
+
+                Project.objects.values(
+                    "project_name",
+                    "progress"
+                )
+            )
+    }
+
+    return JsonResponse(dashboard)
 
 

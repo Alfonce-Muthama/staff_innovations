@@ -9,8 +9,8 @@ def award_points(user, action):
     try:
         rule = PointRule.objects.get(action=action)
     except PointRule.DoesNotExist:
-        raise ValueError(f"No PointRule found for action '{action}'")
-
+        print(f"PointRule '{action}' not found.")
+        return 0
     # Update user's total points
     user.points += rule.points
     user.save()

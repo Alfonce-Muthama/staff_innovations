@@ -27,7 +27,6 @@ class TransactionLogBase(BaseModel):
     user_ip_address = models.GenericIPAddressField(null=True, blank=True)
     event_type = models.ForeignKey(EventType,on_delete=models.PROTECT,null=True, blank=True)
     event_message = models.TextField(null=True, blank=True)
-    event_date = models.DateField(null=True, blank=True)
     triggered_by = models.ForeignKey("users.User", null=True, blank=True, on_delete=models.CASCADE)
     entity_type = models.CharField(null=True, blank=True, max_length=200)
     entity_id = models.CharField(null=True, blank=True, max_length=150)
@@ -35,7 +34,7 @@ class TransactionLogBase(BaseModel):
 
 
 class Notifications(BaseModel):
-    TransactionLogBase = models.ForeignKey("TransactionLogBase", on_delete=models.CASCADE, null=True, blank=True)
+    transaction_log = models.ForeignKey("TransactionLogBase", on_delete=models.CASCADE, null=True, blank=True)
     read_at = models.DateField(null=True, blank=True)
     recipient = models.ForeignKey("users.User", on_delete=models.CASCADE, null=True, blank=True)
 

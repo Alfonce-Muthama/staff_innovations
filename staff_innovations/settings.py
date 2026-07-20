@@ -26,12 +26,12 @@ SECRET_KEY = 'django-insecure-xv8&89d1%6d0r4a$e^1=@d&fmjgjhwo44b1x7r)&geuwer$7@j
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['vacant-grime-headrest.ngrok-free.dev',
-                 '127.0.0.1', 'localhost', '192.168.1.35'
-
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", ".ngrok-free.dev",
 ]
+
 CSRF_TRUSTED_ORIGINS = [
     "https://vacant-grime-headrest.ngrok-free.dev",
+    "http://localhost:3000",
 ]
 
 
@@ -51,9 +51,13 @@ INSTALLED_APPS = [
     'Transaction_Log_Base',
     'Gamification',
     'corsheaders',
+    'dashboard',
 
 ]
-CORS_ORIGIN_ALLOW_ALL = True
+CORS_ALLOWED_ORIGINS =[
+    "http://localhost:3000",
+    "https://vacant-grime-headrest.ngrok-free.dev",
+]
 
 CORS_ALLOW_CREDENTIALS = True
 
@@ -66,9 +70,9 @@ CRSF_COOKIE_SAMESITE = "None"
 
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
