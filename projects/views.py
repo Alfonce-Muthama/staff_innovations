@@ -7,6 +7,7 @@ from users.decorators import jwt_required,role_required
 from .models import Project, ProjectPhase, Task
 from users.models import User
 from .services import complete_task
+from Transaction_Log_Base.models import EventType
 
 
 @csrf_exempt
@@ -24,10 +25,12 @@ def create_phase(request, project_id):
         phase_name=data["phase_name"],
         description=data.get("description", "")
     )
+
+    event_type = EventType.objects.get(name="CREATE_PHASE")
     AuditLogger.log(
         request=request,
         user=project.user_id,  # the user performing the action
-        event_type="CREATE_PHASE",
+        event_type=event_type,
         message=f"Created phase '{phase.phase_name}' in project '{project.project_name}'",
         entity_type="ProjectPhase",
         entity_id=phase.id,
@@ -55,10 +58,12 @@ def create_task(request, phase_id):
         priority=data.get("priority"),
         due_date=parse_date(data["due_date"]) if data.get("due_date") else None,
     )
+
+    event_type = EventType.objects.get(name="CREATE_TASK")
     AuditLogger.log(
         request=request,
         user=request.user,  # or fetch the user from request.user_id
-        event_type="CREATE_TASK",
+        event_type=event_type,
         message=f"Created task '{task.title}'",
         entity_type="Task",
         entity_id=task.id,
@@ -77,10 +82,12 @@ def mark_task_complete(request, task_id):
 
     task = Task.objects.get(pk=task_id)
     complete_task(task)
+
+    event_type = EventType.objects.get(name="COMPLETE_TASK")
     AuditLogger.log(
         request=request,
         user=request.user,
-        event_type="COMPLETE_TASK",
+        event_type=event_type,
         message=f"Marked task '{task.title}' as completed",
         entity_type="Task",
         entity_id=task.id,
@@ -126,7 +133,7 @@ def project_detail(request, pk):
 
 @csrf_exempt
 @jwt_required
-@role_required(["Product Manager"])
+@role_required(["Product Manager","Admin"])
 def update_project(request, pk):
     if request.method != "PUT":
         return JsonResponse({"error": "PUT method required"}, status=405)
@@ -142,10 +149,11 @@ def update_project(request, pk):
     project.end_date = parse_date(data["end_date"]) if data.get("end_date") else project.end_date
     project.save()
 
+    event_type = EventType.objects.get(name="UPDATE_PROJECT")
     AuditLogger.log(
         request=request,
         user=request.user,  # or fetch the user using request.user_id
-        event_type="UPDATE_PROJECT",
+        event_type=event_type,
         message=f"Project '{project.project_name}' was updated.",
         entity_type="Project",
         entity_id=project.id,
@@ -164,11 +172,11 @@ def delete_project(request, pk):
 
     try:
         project = Project.objects.get(pk=pk)
-
+        event_type = EventType.objects.get(name="DELETE_PROJECT")
         AuditLogger.log(
             request=request,
             user=getattr(request, "user", None),  # or fetch the user from request.user_id
-            event_type="DELETE_PROJECT",
+            event_type=event_type,
             message=f"Project '{project.project_name}' was deleted.",
             entity_type="Project",
             entity_id=project.id,

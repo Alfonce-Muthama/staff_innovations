@@ -12,7 +12,7 @@ from django.http import HttpRequest
 from django.db.models import Count, Avg
 from users.models import User, Role, Department
 from ideas.models import Idea
-from projects.models import Project,Task,ProjectPhase
+from projects.models import Project,Task
 from django.utils import timezone
 from Gamification.models import Badge,UserBadge,PointRule,PointHistory
 
@@ -217,7 +217,7 @@ def login_user(request: HttpRequest):
             key="jwt",
             value=token,
             httponly=True,
-            secure=False,        # True in production
+            secure=False,        
             samesite="Lax",
             max_age=60 * 60
         )
@@ -461,15 +461,15 @@ def dashboard(request):
         "total": Task.objects.count(),
 
         "completed": Task.objects.filter(
-            is_completed=True
+            completed=True
         ).count(),
 
         "pending": Task.objects.filter(
-            is_completed=False
+            completed=False
         ).count(),
 
         "overdue": Task.objects.filter(
-            is_completed=False,
+            completed=False,
             due_date__lt=timezone.localdate()
         ).count()
     }
@@ -504,7 +504,7 @@ def dashboard(request):
         "today":
 
             TransactionLogBase.objects.filter(
-                event_date=timezone.localdate()
+                created_at=timezone.localdate()
             ).count(),
 
         "recent":

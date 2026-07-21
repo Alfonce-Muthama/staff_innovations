@@ -1,9 +1,11 @@
+from asyncio import events
+
 from django.utils import timezone
 from django.db import transaction
 from .models import Idea, IdeaVote, IdeaComment
 from projects.models import Project
 from Gamification.services import award_points
-from Transaction_Log_Base.models import Notifications
+from Transaction_Log_Base.models import Notifications,TransactionLogBase
 
 DRAFT = "Draft"
 SUBMITTED = "Submitted"
@@ -135,7 +137,7 @@ def approve_idea(
         project_name=idea.title,
         description=idea.description,
         start_date=timezone.now().date(),
-        progress="0%"
+
     )
 
     create_notification(
@@ -187,14 +189,18 @@ def create_notification(
         title,
         message
 ):
-    Notifications.objects.create(
+    log = TransactionLogBase.objects.create(
         title=title,
         event_message=message,
         triggered_by=user,
-        event_date=timezone.now().date(),
         entity_type="Idea",
         entity_id=str(user.id),
-        entity_name=user.username
+        entity_name=user.username,
+    )
+
+    Notifications.objects.create(
+        transaction_log=log,
+        recipient=user,
     )
 
 

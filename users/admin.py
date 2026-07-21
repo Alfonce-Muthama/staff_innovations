@@ -6,7 +6,7 @@ from .models import User, Department, Role
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
     readonly_fields = ["id", "created_at", "updated_at"]
-    list_display = ["username", "email", "first_name", "last_name"]
+    list_display = ["username", "email", "first_name", "last_name", "role"]
 
     def save_model(self, request, obj, form, change):
         # Hash the password only when it is new or has been changed

@@ -213,7 +213,7 @@ def delete_idea(request, pk):
 
         current_user = User.objects.select_related("role").get(id=request.user_id)
 
-        is_creator = str(idea.creator.id) == request.user_id
+        is_creator = idea.creator.id == request.user_id
         is_admin = current_user.role and current_user.role.name == "Admin"
 
         if not (is_creator or is_admin):
@@ -387,7 +387,7 @@ def dislike_idea(request, pk):
 #PRODUCT MANAGER APPROVAL/REJECTION
 @csrf_exempt
 @jwt_required
-@role_required(["Product Manager"])
+@role_required(["Product Manager", "Admin"])
 def approve_idea(request, pk):
     if request.method != "POST":
         return JsonResponse({"error": "POST method required"}, status=405)
@@ -429,7 +429,7 @@ def approve_idea(request, pk):
 
 @csrf_exempt
 @jwt_required
-@role_required(["Product Manager"])
+@role_required(["Product Manager","Admin"])
 def reject_idea(request, pk):
     if request.method != "POST":
         return JsonResponse({"error": "POST method required"}, status=405)
