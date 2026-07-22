@@ -219,7 +219,7 @@ def login_user(request: HttpRequest):
             httponly=True,
             secure=False,        
             samesite="Lax",
-            max_age=60 * 60
+            max_age=7 * 24 * 60 * 60
         )
 
         try:
@@ -279,6 +279,8 @@ def update_user(request, pk):
                 user.password = make_password(data["password"])
             user.first_name = data.get("first_name", user.first_name)
             user.last_name = data.get("last_name", user.last_name)
+            ##[ff,rtr43r,3r34t34,hj]
+
             if "role" in data:
                 try:
                     role = Role.objects.get(name=data["role"])
