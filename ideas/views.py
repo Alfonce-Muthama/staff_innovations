@@ -78,7 +78,7 @@ def list_ideas(request):
             {"error": "GET method required"},
             status=405
         )
-    ideas = Idea.objects.select_related("creator")
+    ideas = Idea.objects.select_related("creator").filter(status="submitted")
     data = []
     for idea in ideas:
         data.append({"id": str(idea.id),
@@ -408,7 +408,7 @@ def approve_idea(request, pk):
             product_manager=User.objects.get(id=request.user_id),
         )
 
-        event_type = EventType.objects.get(name="IDEA_APPROVED")
+        event_type = EventType.objects.get(name="PROJECT_CREATED")
         AuditLogger.log(
             request=request,
             user=User.objects.get(id=request.user_id),
@@ -419,7 +419,7 @@ def approve_idea(request, pk):
             entity_name=idea.title,
         )
         return JsonResponse({
-            "message": "Idea approved successfully",
+            "message": "Idea approved and project created successfully.",
             "project_id": str(project.id),
         })
 

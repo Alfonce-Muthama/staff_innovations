@@ -194,7 +194,7 @@ def login_user(request: HttpRequest):
             "role": user.role.name if user.role else None,
             "iat": datetime.datetime.now(datetime.UTC),
             "exp": datetime.datetime.now(datetime.UTC)
-                   + datetime.timedelta(minutes=30),
+                   + datetime.timedelta(hours=2),
 
         }
 
@@ -219,7 +219,7 @@ def login_user(request: HttpRequest):
             httponly=True,
             secure=False,        
             samesite="Lax",
-            max_age=7 * 24 * 60 * 60
+            max_age=2 * 60 * 60
         )
 
         try:
@@ -359,7 +359,7 @@ def delete_user(request, pk):
 
  #The dashboard
 @jwt_required
-@role_required(["Admin"])
+@role_required(["Admin","Developer","Product Manager"])
 def dashboard(request):
 
     dashboard = {}
@@ -559,6 +559,20 @@ def dashboard(request):
                 )[:10]
             )
     }
+#recent ideas
+    dashboard["recent_ideas"] = list(
+        Idea.objects.filter(
+            creator=request.user
+        )
+        .order_by("-created_at")
+        .values(
+            "id",
+            "title",
+            "status",
+            "likes",
+            "created_at"
+        )[:5]
+    )
 
 # CHARTS
     dashboard["charts"] = {
@@ -635,6 +649,7 @@ def dashboard(request):
                 )
             )
     }
+
 
     return JsonResponse(dashboard)
 
