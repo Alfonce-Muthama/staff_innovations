@@ -15,7 +15,7 @@ from ideas.models import Idea
 from projects.models import Project,Task
 from django.utils import timezone
 from Gamification.models import Badge,UserBadge,PointRule,PointHistory
-
+from Base.pagination import paginate_queryset
 
 
 
@@ -355,6 +355,38 @@ def delete_user(request, pk):
 
     return JsonResponse({"error": "DELETE method required"}, status=405)
 
+#LIST
+@jwt_required
+@role_required(["Admin"])
+def list_users(request):
+
+    users = User.objects.select_related(
+        "role",
+        "department_id"
+    ).order_by("username")
+
+    def serialize(user):
+        return {
+            "id": str(user.id),
+            "username": user.username,
+            "email": user.email,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "role": user.role.name if user.role else None,
+            "department": (
+                user.department_id.department_name
+                if user.department_id else None
+            ),
+            "points": user.points,
+        }
+
+    return paginate_queryset(
+        request,
+        users,
+        serialize,
+        per_page=10
+    )
+
 
 
  #The dashboard
@@ -400,7 +432,7 @@ def dashboard(request):
             status="Draft"
         ).count(),
 
-        "submitted": Idea.objects.filter(
+        "Submitted": Idea.objects.filter(
             status="Submitted"
         ).count(),
 
@@ -559,7 +591,7 @@ def dashboard(request):
                 )[:10]
             )
     }
-#recent ideas
+#RECENT IDEAS
     dashboard["recent_ideas"] = list(
         Idea.objects.filter(
             creator=request.user

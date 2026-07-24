@@ -8,5 +8,7 @@ urlpatterns = [
 
     path("update/<uuid:pk>/", views.update_user),
     path("delete/<uuid:pk>/", views.delete_user),
+    path("list/", views.list_users),
+    
 ]
 

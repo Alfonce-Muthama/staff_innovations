@@ -7,6 +7,7 @@ from .models import Idea
 from .services import create_idea
 from Transaction_Log_Base.services import AuditLogger
 from Transaction_Log_Base.models import EventType
+from django.core.paginator import Paginator
 import json
 from .services import (
     submit_idea as submit_idea_service,
@@ -78,19 +79,50 @@ def list_ideas(request):
             {"error": "GET method required"},
             status=405
         )
-    ideas = Idea.objects.select_related("creator").filter(status="submitted")
+
+    page = request.GET.get("page", 1)
+    page_size = request.GET.get("page_size", 10)
+
+    try:
+        page_size = int(page_size)
+    except ValueError:
+        page_size = 10
+
+    ideas = Idea.objects.select_related("creator").order_by("-created_at")
+
+    paginator = Paginator(ideas, page_size)
+
+    try:
+        page_obj = paginator.page(page)
+    except:
+        return JsonResponse(
+            {"error": "Invalid page number"},
+            status=400
+        )
+
     data = []
-    for idea in ideas:
-        data.append({"id": str(idea.id),
+
+    for idea in page_obj:
+        data.append({
+            "id": str(idea.id),
             "title": idea.title,
             "description": idea.description,
             "status": idea.status,
             "priority": idea.priority,
             "likes": idea.likes,
             "dislikes": idea.dislikes,
-            "creator": idea.creator.username
+            "creator": idea.creator.username,
         })
-    return JsonResponse(data, safe=False)
+
+    return JsonResponse({
+        "count": paginator.count,
+        "total_pages": paginator.num_pages,
+        "current_page": page_obj.number,
+        "page_size": page_size,
+        "has_next": page_obj.has_next(),
+        "has_previous": page_obj.has_previous(),
+        "results": data,
+    })
 
 @jwt_required
 def idea_detail(request, pk):

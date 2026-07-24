@@ -1,5 +1,6 @@
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.core.paginator import Paginator, EmptyPage
 from django.utils.dateparse import parse_date
 import json
 from Transaction_Log_Base.services import AuditLogger
@@ -101,18 +102,51 @@ def mark_task_complete(request, task_id):
 @jwt_required
 @role_required(["Product Manager"])
 def list_projects(request):
+
     if request.method != "GET":
-        return JsonResponse({"error": "GET method required"}, status=405)
+        return JsonResponse(
+            {"error": "GET method required"},
+            status=405
+        )
+
+    page = request.GET.get("page", 1)
+    page_size = request.GET.get("page_size", 10)
+
+    try:
+        page_size = int(page_size)
+    except ValueError:
+        page_size = 10
+
+    projects = Project.objects.all().order_by("-created_at")
+
+    paginator = Paginator(projects, page_size)
+
+    try:
+        page_obj = paginator.page(page)
+    except EmptyPage:
+        return JsonResponse(
+            {"error": "Invalid page number"},
+            status=400
+        )
 
     data = [
         {
-            "id": str(p.id),
-            "name": p.project_name,
-            "progress": p.progress,
+            "id": str(project.id),
+            "name": project.project_name,
+            "progress": project.progress,
         }
-        for p in Project.objects.all()
+        for project in page_obj
     ]
-    return JsonResponse(data, safe=False)
+
+    return JsonResponse({
+        "count": paginator.count,
+        "total_pages": paginator.num_pages,
+        "current_page": page_obj.number,
+        "page_size": page_size,
+        "has_next": page_obj.has_next(),
+        "has_previous": page_obj.has_previous(),
+        "results": data,
+    })
 
 
 @csrf_exempt
